@@ -1,5 +1,8 @@
 <?php
-require 'db_connection.php';
+require_once __DIR__ . '/auth.php';
+requireAuth();
+
+require_once __DIR__ . '/db_connection.php';
 
 $content = trim(file_get_contents("php://input"));
 $decoded = json_decode($content, true);

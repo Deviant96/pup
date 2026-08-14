@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/load_env.php';
+denyDirectAccess(__FILE__);
+
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/push_config.php';
 

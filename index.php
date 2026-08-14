@@ -1,10 +1,14 @@
 <?php
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+require_once __DIR__ . '/auth.php';
+requireAuth();
 
-include 'db_connection.php';
-include 'push_config.php';
+require_once __DIR__ . '/db_connection.php';
+require_once __DIR__ . '/push_config.php';
+
+$debug = env('APP_DEBUG', '0') === '1';
+error_reporting(E_ALL);
+ini_set('display_errors', $debug ? '1' : '0');
+ini_set('log_errors', '1');
 
 function isTaggingReady(PDO $pdo): bool {
     static $ready = null;
@@ -1247,6 +1251,9 @@ if ($tagFilter !== '') {
                 </button>
                 <a href="manage.php" class="btn btn-success">
                     🛍️ Manage Products
+                </a>
+                <a href="logout.php" class="btn btn-secondary">
+                    Log out
                 </a>
             </div>
         </div>

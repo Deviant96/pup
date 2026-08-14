@@ -1,7 +1,8 @@
 <?php
-session_start();
+require_once __DIR__ . '/auth.php';
+requireAuth();
 
-include 'db_connection.php';
+require_once __DIR__ . '/db_connection.php';
 
 function isTaggingReady(PDO $pdo): bool {
     static $ready = null;
@@ -1270,9 +1271,14 @@ if (isset($_GET['edit'])) {
                     <h1 class="page-title">🛍️ Product Management Dashboard</h1>
                     <p class="page-subtitle">Manage your product scraping queue and monitor performance</p>
                 </div>
-                <a href="index.php" class="btn btn-primary">
-                    📊 View Price Dashboard
-                </a>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="index.php" class="btn btn-primary">
+                        📊 View Price Dashboard
+                    </a>
+                    <a href="logout.php" class="btn btn-secondary">
+                        Log out
+                    </a>
+                </div>
             </div>
         </div>
 

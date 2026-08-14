@@ -1,6 +1,8 @@
 <?php
-// Database connection (same as before)
-include 'db_connection.php';
+require_once __DIR__ . '/auth.php';
+requireAuth();
+
+require_once __DIR__ . '/db_connection.php';
 
 if (isset($_GET['product_id'])) {
     $productId = (int)$_GET['product_id'];
