@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@nesk/puphpeteer": "^2.0.0",
+    "@zoon/puphpeteer": "git+https://git@github.com/zoonru/puphpeteer.git#zoon",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}

@@ -1,0 +1,15 @@
+{
+    "require-dev": {
+        "nesk/puphpeteer": "^2.0",
+        "zoon/puphpeteer": "^1.6"
+    },
+    "require": {
+        "react/promise": "^3.2",
+        "react/event-loop": "^1.5",
+        "clue/mq-react": "^1.7",
+        "react/http": "^3@dev",
+        "react/promise-timer": "^1.11",
+        "clue/http-proxy-react": "^1.9",
+        "minishlink/web-push": "^9.0"
+    }
+}

@@ -1,0 +1,14 @@
+/vendor/
+/node_modules/
+/logs/
+/screenshots/
+/local/*
+!/local/.htaccess
+!/local/.gitkeep
+*.log
+*.log.save*
+*.bak.php
+*.bak2.php
+.env
+.env.*
+!.env.example
