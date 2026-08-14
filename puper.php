@@ -246,93 +246,127 @@ function loadPage($page, $target_url, $sessionLogFile = null, $productId = null)
     }
 }
 
-// Function to extract text content from the page
-function extractText($page, $sessionLogFile = null, $productId = null) {
-    // Try multiple selector strategies
-    $name = null;
-    $nameSelectors = [
-        'div.css-1nylpq2 > h1',
-        'h1[data-testid="pdpProductName"]',
-        'h1.css-1os9ouf',
-        'h1'
-    ];
-    
-    foreach ($nameSelectors as $selector) {
+function queryFirst($page, array $selectors, $sessionLogFile, $productId, $attribute = null) {
+    foreach ($selectors as $selector) {
         try {
-            $name = $page->evaluate("document.querySelector('$selector')?.textContent");
-            if ($name) {
-                writeLog("Found product name with selector: $selector", "INFO", $sessionLogFile, $productId);
-                break;
+            $encodedSelector = json_encode($selector);
+            $js = $attribute === null
+                ? "document.querySelector($encodedSelector)?.textContent"
+                : "document.querySelector($encodedSelector)?.getAttribute(" . json_encode($attribute) . ")";
+            $value = $page->evaluate($js);
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+            if ($value !== null && $value !== '') {
+                writeLog("Found with selector: $selector", "INFO", $sessionLogFile, $productId);
+                return [$value, $selector];
             }
         } catch (Exception $e) {
             continue;
         }
     }
-    
+
+    return [null, null];
+}
+
+function parsePrice($raw) {
+    if (!is_string($raw)) {
+        return null;
+    }
+
+    $raw = trim($raw);
+    if ($raw === '' || $raw === '-') {
+        return null;
+    }
+
+    $digits = preg_replace('/[^\d]/', '', $raw);
+    if ($digits === '') {
+        return null;
+    }
+
+    return (int) $digits;
+}
+
+function parseStockLabel($label) {
+    if (!is_string($label) || trim($label) === '') {
+        return null;
+    }
+
+    if (preg_match('/habis|kosong|out of stock/i', $label)) {
+        return 0;
+    }
+
+    if (preg_match('/(\d+)/', $label, $match)) {
+        return (int) $match[1];
+    }
+
+    return null;
+}
+
+function extractText($page, $sessionLogFile = null, $productId = null) {
+    [$name] = queryFirst($page, [
+        '[data-testid="lblPDPDetailProductName"]',
+        'div.css-1nylpq2 > h1',
+        'h1',
+    ], $sessionLogFile, $productId);
+
     if (!$name) {
         throw new Exception("Could not extract product name");
     }
-    
-    // Try multiple price selectors
-    $amount_raw = null;
+
     $priceSelectors = [
+        '[data-testid="lblPDPDetailProductPrice"]',
         'div.price',
-        '[data-testid="pdpPrice"]',
-        '.css-o5uqvq',
-        'div[class*="price"]'
+        'div[class*="price"]',
     ];
-    
+
+    $amountInt = null;
     foreach ($priceSelectors as $selector) {
-        try {
-            $amount_raw = $page->evaluate("document.querySelector('$selector')?.textContent");
-            if ($amount_raw) {
-                writeLog("Found price with selector: $selector", "INFO", $sessionLogFile, $productId);
-                break;
-            }
-        } catch (Exception $e) {
-            continue;
+        [$raw, $matchedSelector] = queryFirst($page, [$selector], $sessionLogFile, $productId);
+        $amountInt = parsePrice($raw);
+        if ($amountInt !== null) {
+            writeLog("Parsed price $amountInt from $matchedSelector ($raw)", "INFO", $sessionLogFile, $productId);
+            break;
+        }
+        if ($raw !== null) {
+            writeLog("Skipped non-numeric price from $selector: $raw", "WARNING", $sessionLogFile, $productId);
         }
     }
-    
-    if (!$amount_raw) {
+
+    if ($amountInt === null) {
         throw new Exception("Could not extract price");
     }
-    
-    $amount_clean = preg_replace('/[^\d]/', '', $amount_raw);
-    $amount_int = (int) $amount_clean;
-    
-    // Try to get stock, but make it optional
-    $stock = 0;
-    $stockSelectors = [
-        '.css-1h8vbi4 input',
+
+    $stock = null;
+    [$stockValue, $stockSelector] = queryFirst($page, [
         'input[aria-valuemax]',
-        'input[type="number"]'
-    ];
-    
-    foreach ($stockSelectors as $selector) {
-        try {
-            $stockValue = $page->evaluate("document.querySelector('$selector')?.getAttribute('aria-valuemax')");
-            if ($stockValue) {
-                $stock = (int) $stockValue;
-                writeLog("Found stock with selector: $selector", "INFO", $sessionLogFile, $productId);
-                break;
-            }
-        } catch (Exception $e) {
-            continue;
+        '.css-1h8vbi4 input',
+    ], $sessionLogFile, $productId, 'aria-valuemax');
+
+    if ($stockValue !== null && is_numeric($stockValue)) {
+        $stock = (int) $stockValue;
+        writeLog("Found stock $stock with selector: $stockSelector", "INFO", $sessionLogFile, $productId);
+    }
+
+    if ($stock === null) {
+        [$stockLabel, $labelSelector] = queryFirst($page, [
+            '[data-testid="stock-label"]',
+        ], $sessionLogFile, $productId);
+        $stock = parseStockLabel($stockLabel);
+        if ($stock !== null) {
+            writeLog("Found stock $stock from $labelSelector ($stockLabel)", "INFO", $sessionLogFile, $productId);
         }
     }
-    
-    if ($stock === 0) {
-        writeLog("Could not extract stock, defaulting to 0", "WARNING", $sessionLogFile, $productId);
+
+    if ($stock === null) {
+        writeLog("Could not extract stock; leaving existing stock unchanged", "WARNING", $sessionLogFile, $productId);
     }
 
-    $product = [
+    return [
         'name' => trim($name),
-        'price' => $amount_int,
+        'price' => $amountInt,
         'stock' => $stock
     ];
-
-    return $product;
 }
 
 function scrapeProduct($pdo, $product_id, $target_url, $browser, $sessionFolder, $sessionLogFile) {
@@ -358,8 +392,7 @@ function scrapeProduct($pdo, $product_id, $target_url, $browser, $sessionFolder,
         loadPage($page, $target_url, $sessionLogFile, $product_id);
         $product = extractText($page, $sessionLogFile, $product_id);
         
-        // Validate extracted data
-        if (empty($product['name']) || empty($product['price']) || !isset($product['stock'])) {
+        if (empty($product['name']) || empty($product['price'])) {
             throw new Exception("Invalid product data extracted");
         }
 
