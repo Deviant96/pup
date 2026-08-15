@@ -1,7 +1,6 @@
 /vendor/
 /node_modules/
 /logs/
-/screenshots/
 /local/*
 !/local/.htaccess
 !/local/.gitkeep

@@ -31,19 +31,6 @@ if (!is_dir($productsLogDir)) {
     mkdir($productsLogDir, 0777, true);
 }
 
-// Create session folder for screenshots (use absolute path)
-$sessionFolder = __DIR__ . '/screenshots/session_' . $sessionId;
-if (!is_dir($sessionFolder)) {
-    if (mkdir($sessionFolder, 0777, true)) {
-        echo "📁 Created session folder: $sessionFolder\n";
-    } else {
-        echo "❌ Failed to create session folder: $sessionFolder\n";
-        echo "Current working directory: " . getcwd() . "\n";
-    }
-} else {
-    echo "📁 Session folder already exists: $sessionFolder\n";
-}
-
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     die("❌ Database connection failed: missing PDO instance.\n");
 }
@@ -369,7 +356,7 @@ function extractText($page, $sessionLogFile = null, $productId = null) {
     ];
 }
 
-function scrapeProduct($pdo, $product_id, $target_url, $browser, $sessionFolder, $sessionLogFile) {
+function scrapeProduct($pdo, $product_id, $target_url, $browser, $sessionLogFile) {
     $page = null;
     $product_name = null;
     $price = null;
@@ -434,38 +421,9 @@ function scrapeProduct($pdo, $product_id, $target_url, $browser, $sessionFolder,
         } else {
             writeLog("Product $product_id: updated with name '$product_name' and price '$price'.", "INFO", $sessionLogFile, $product_id);
         }
-
-        // Take screenshot on success
-        try {
-            $sanitizedName = preg_replace('/[^a-zA-Z0-9_-]/', '_', substr($product_name, 0, 50));
-            $screenshotPath = "$sessionFolder/product_{$product_id}_{$sanitizedName}.png";
-            $page->screenshot([
-                'path' => $screenshotPath,
-                'fullPage' => true
-            ]);
-            writeLog("Screenshot saved: $screenshotPath", "INFO", $sessionLogFile, $product_id);
-        } catch (Exception $e) {
-            writeLog("Screenshot failed: " . $e->getMessage(), "WARNING", $sessionLogFile, $product_id);
-        }
-        
     } catch (Exception $e) {
         $error_message = $e->getMessage();
         writeLog("Error scraping product ID $product_id: " . $error_message, "ERROR", $sessionLogFile, $product_id);
-        
-        // Take screenshot on failure for debugging
-        if ($page !== null) {
-            try {
-                $screenshotPath = "$sessionFolder/product_{$product_id}_ERROR_" . date('His') . ".png";
-                $page->screenshot([
-                    'path' => $screenshotPath,
-                    'fullPage' => true,
-                    'timeout' => 5000  // Short timeout for error screenshots
-                ]);
-                writeLog("Error screenshot saved: $screenshotPath", "INFO", $sessionLogFile, $product_id);
-            } catch (Exception $screenshotEx) {
-                writeLog("Error screenshot failed: " . $screenshotEx->getMessage(), "WARNING", $sessionLogFile, $product_id);
-            }
-        }
     } finally {
         // Log the scraping attempt
         try {
@@ -485,7 +443,7 @@ function scrapeProduct($pdo, $product_id, $target_url, $browser, $sessionFolder,
 }
 
 // Function to scrape multiple product pages in parallel
-function scrapeMultipleProducts($pdo, $products, $sessionFolder, $sessionLogFile) {  
+function scrapeMultipleProducts($pdo, $products, $sessionLogFile) {  
     $loop = React\EventLoop\Factory::create();
     $concurrency = 1; // Sequential scraping for better reliability
     $browser = launchBrowser($loop); // Launch the browser
@@ -502,7 +460,7 @@ function scrapeMultipleProducts($pdo, $products, $sessionFolder, $sessionLogFile
     //     });
     // }
     foreach ($products as $product) {
-        $promises[] = (new Promise(function ($resolve, $reject) use ($pdo, $product, $browser, $sessionFolder, $sessionLogFile) {
+        $promises[] = (new Promise(function ($resolve, $reject) use ($pdo, $product, $browser, $sessionLogFile) {
         // $promises[] = $queue->enqueue(function () use ($url, $browser) {
         //     return new React\Promise\Promise(function ($resolve) use ($url, $browser) {
         //         scrapeProduct($url, $browser);
@@ -511,7 +469,7 @@ function scrapeMultipleProducts($pdo, $products, $sessionFolder, $sessionLogFile
 
 
             try {
-                scrapeProduct($pdo, $product['id'], $product['url'], $browser, $sessionFolder, $sessionLogFile);
+                scrapeProduct($pdo, $product['id'], $product['url'], $browser, $sessionLogFile);
                 $resolve(null);  // Fix: Call resolve() with a value (null in this case)
             } catch (Exception $e) {
                 $reject($e);
@@ -649,7 +607,7 @@ if (empty($products)) {
     exit;
 } else {
     writeLog("Found " . count($products) . " products to scrape", "INFO", $sessionLogFile);
-    scrapeMultipleProducts($pdo, $products, $sessionFolder, $sessionLogFile);
+    scrapeMultipleProducts($pdo, $products, $sessionLogFile);
 }
 
 // Total time taken for the entire process
